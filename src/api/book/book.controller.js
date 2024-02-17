@@ -117,26 +117,111 @@ exports.updateReadingProgress = async (req, res) => {
     }
 };
 
-// New function to generate book recommendations
 exports.getBookRecommendations = async (req, res) => {
     const user = req.user.id;
 
     try {
-        // Find genres of books the user is interested in
         const userBooks = await Book.find({ user }).select('genres');
         const genres = userBooks.map(book => book.genres).flat();
-
-        // Get unique genres
         const uniqueGenres = [...new Set(genres)];
 
-        // Find books in those genres not added by the user
         const recommendations = await Book.find({
             genres: { $in: uniqueGenres },
             user: { $ne: user }
-        }).limit(10); // Limit to 10 recommendations for simplicity
+        }).limit(10);
 
         res.json(recommendations);
     } catch (error) {
         res.status(500).json({ message: 'Server error while getting book recommendations', error: error.message });
     }
 };
+
+// Implementing review functionalities
+exports.addReview = async (req, res) => {
+    const { bookId } = req.params;
+    const { text, rating } = req.body;
+
+    if (!handleValidationErrors(req, res)) return;
+
+    try {
+        const book = await Book.findById(bookId);
+        if (!book) {
+            return res.status(404).json({ message: "Book not found" });
+        }
+
+        const newReview = {
+            reviewer: req.user.id,
+            text,
+            rating,
+            createdAt: new Date()
+        };
+
+        book.reviews.push(newReview);
+        await book.save();
+
+        res.status(201).json({ message: "Review added successfully", book });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while adding a review', error: error.message });
+    }
+};
+
+exports.updateReview = async (req, res) => {
+    const { bookId, reviewId } = req.params;
+    const { text, rating } = req.body;
+    try {
+        const book = await Book.findById(bookId);
+        if (!book) {
+            return res.status(404).json({ message: "Book not found." });
+        }
+
+        // Find the review by ID
+        const review = book.reviews.id(reviewId);
+        if (!review) {
+            return res.status(404).json({ message: "Review not found." });
+        }
+
+        // Check if the current user is the reviewer
+        if (review.reviewer.toString() !== req.user.id) {
+            return res.status(403).json({ message: "User not authorized to update this review." });
+        }
+
+        // Update the review
+        review.text = text;
+        review.rating = rating;
+        await book.save();
+
+        res.json({ message: "Review updated successfully.", review });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while updating review', error: error.message });
+    }
+};
+
+
+exports.deleteReview = async (req, res) => {
+    const { bookId, reviewId } = req.params;
+    try {
+        const book = await Book.findById(bookId);
+        if (!book) {
+            return res.status(404).json({ message: "Book not found." });
+        }
+
+        // Find and remove the review
+        const review = book.reviews.id(reviewId);
+        if (!review) {
+            return res.status(404).json({ message: "Review not found." });
+        }
+
+        // Check if the current user is the reviewer
+        if (review.reviewer.toString() !== req.user.id) {
+            return res.status(403).json({ message: "User not authorized to delete this review." });
+        }
+
+        review.remove();
+        await book.save();
+
+        res.json({ message: "Review deleted successfully." });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while deleting review', error: error.message });
+    }
+};
+

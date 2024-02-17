@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
     email: {
         type: String,
         required: true,
@@ -12,7 +17,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    // Adding profile information
+    // Existing profile information
     profilePicture: {
         type: String,
         default: ''
@@ -29,6 +34,9 @@ const userSchema = new mongoose.Schema({
         // Add other social fields as needed
     }
 }, { timestamps: true });
+
+// Adding a text index for the name field for search functionality
+userSchema.index({ name: 'text' });
 
 // Encrypt password before save
 userSchema.pre('save', async function (next) {

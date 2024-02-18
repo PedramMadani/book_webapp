@@ -17,7 +17,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    // Existing profile information
     profilePicture: {
         type: String,
         default: ''
@@ -31,19 +30,19 @@ const userSchema = new mongoose.Schema({
         twitter: { type: String, default: '' },
         instagram: { type: String, default: '' },
         facebook: { type: String, default: '' },
-        // Add other social fields as needed
     }
 }, { timestamps: true });
 
-// Adding a text index for the name field for search functionality
 userSchema.index({ name: 'text' });
 
-// Encrypt password before save
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
-
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
 });
 
-module.exports = mongoose.model('User', userSchema);
+// Prevent model overwrite upon recompilation
+const modelName = 'User';
+module.exports = mongoose.models[modelName] // Check if the model exists
+    ? mongoose.model(modelName) // If true, use the existing model
+    : mongoose.model(modelName, userSchema); // If false, compile a new model

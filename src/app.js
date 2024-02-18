@@ -1,73 +1,61 @@
-
-Implementing a centralized error handling middleware allows you to catch and handle errors uniformly across your application.This middleware will ensure that any errors thrown or passed along in your route handlers or other middleware are dealt with in a consistent manner, improving the reliability and maintainability of your code.
-
-    errorHandlingMiddleware.js
-javascript
-Copy code
-// errorHandlingMiddleware.js
-function errorHandlingMiddleware(err, req, res, next) {
-    // Log the error for debugging purposes
-    console.error(err);
-
-    // Determine the status code based on the error
-    const statusCode = err.statusCode || 500; // Default to 500 if statusCode not set
-
-    // Send a generic error message or a specific one if defined
-    res.status(statusCode).json({
-        error: {
-            message: err.message || 'An unexpected error occurred on the server.',
-            status: statusCode,
-            timestamp: new Date(),
-        },
-    });
-}
-
-module.exports = errorHandlingMiddleware;
-Integrating errorHandlingMiddleware into Your Application
-After defining the middleware, you need to integrate it into your application to ensure it catches and processes errors effectively.This integration typically occurs in your main application file, such as app.js, after all route definitions and before starting the server.
-
-Update to app.js:
-javascript
-Copy code
+require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
 const passport = require('passport');
-require('dotenv').config();
+const bodyParser = require('body-parser');
+const connectDB = require('./config/db');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load('./src/swagger.yaml');
+const swaggerJsDoc = require('swagger-jsdoc');
+
+// Passport configuration
+require('./config/passport')(passport);
 
 // Import routes
 const authRoutes = require('./api/auth/auth.routes');
-const postRoutes = require('./api/social/post.routes'); // Ensure this path is correct
+const bookRoutes = require('./api/book/book.routes');
+const postRoutes = require('./api/social/post.routes');
+const notificationRoutes = require('./api/notifications/notification.routes');
+const bookListRoutes = require('./api/book/bookList.routes');
 
 // Import middleware
 const authMiddleware = require('./middleware/authMiddleware');
-const errorHandlingMiddleware = require('./middleware/errorHandlingMiddleware'); // Ensure this path is correct
+const errorHandlingMiddleware = require('./middleware/errorHandlingMiddleware');
 
 const app = express();
 
 // Connect to MongoDB
 connectDB();
 
+// Swagger UI setup
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // Apply middlewares
 app.use(helmet());
 app.use(bodyParser.json());
 app.use(passport.initialize());
+app.use(errorHandlingMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after a 15 minute wait'
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again after a 15 minute wait',
 });
 app.use(limiter);
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
+app.use('/api/books', bookListRoutes); // Note: This seems to be intended for bookLists specifically
+app.use('/api/social', postRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {

@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const postController = require('./post.controller');
-const authMiddleware = require('../../middleware/authMiddleware'); // Ensure the path is correct for your project
-const { validatePostCreation, validatePostUpdate, validateCommentAddition } = require('./validationMiddleware'); // Update the path as needed
+const authMiddleware = require('../../middleware/authMiddleware');
+const { validatePostCreation, validatePostUpdate, validateCommentAddition } = require('../../middleware/validationMiddleware');
+const upload = require('../../middleware/imageUploadMiddleware');
 
 // Route to create a new post, with validation
 router.post('/', [authMiddleware, validatePostCreation], postController.createPost);
@@ -22,5 +23,8 @@ router.post('/:postId/comment', [authMiddleware, validateCommentAddition], postC
 // Route to delete a comment from a post
 // This assumes comments have unique IDs and are accessible by postId and commentId
 router.delete('/:postId/comment/:commentId', authMiddleware, postController.deleteCommentFromPost);
+
+// Route for creating a post with an image
+router.post('/', [authMiddleware, upload.single('photo')], postController.createPost);
 
 module.exports = router;
